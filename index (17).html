@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<title>ヨソウ — 友達とポイントで予想</title>
+<style>
+:root{--bg:#f5f6fb;--card:#fff;--ink:#1c1e2b;--sub:#6b7085;--line:#e4e6ef;--pri:#4f46e5;--pri2:#eef0ff;--ok:#16a34a;--warn:#dc2626;--r:14px}
+@media (prefers-color-scheme:dark){:root{--bg:#11131b;--card:#1b1e2a;--ink:#eceef6;--sub:#9aa0b6;--line:#2b2f3f;--pri:#818cf8;--pri2:#262a44}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.5}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:12px 16px;display:flex;align-items:center;gap:10px}
+header h1{font-size:18px;margin:0;flex:1}
+.pts{font-weight:700;color:var(--pri);background:var(--pri2);padding:4px 10px;border-radius:999px;font-size:14px}
+main{max-width:640px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:12px}
+h2{font-size:16px;margin:0 0 10px}
+button{font:inherit;border:0;border-radius:10px;padding:10px 14px;background:var(--pri);color:#fff;font-weight:600;cursor:pointer}
+button.ghost{background:var(--pri2);color:var(--pri)}
+button.sm{padding:6px 10px;font-size:13px}
+button:disabled{opacity:.45;cursor:default}
+input,textarea{font:inherit;width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);margin-bottom:8px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>input{flex:1;margin:0}
+.muted{color:var(--sub);font-size:13px}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tabs button{flex:1}
+.opt{border:1px solid var(--line);border-radius:10px;padding:10px;margin:6px 0;position:relative;overflow:hidden}
+.bar{position:absolute;inset:0 auto 0 0;background:var(--pri2);z-index:0}
+.opt>*{position:relative;z-index:1}
+.opt .top{display:flex;justify-content:space-between;gap:8px}
+.win{border-color:var(--ok)}
+.badge{font-size:12px;padding:2px 8px;border-radius:999px;background:var(--pri2);color:var(--pri)}
+.badge.done{background:#dcfce7;color:var(--ok)}
+.badge.closed{background:#fee2e2;color:var(--warn)}
+.lb{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
+.lb:last-child{border:0}
+.grp{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.grp:last-child{border:0}
+.code{font-family:ui-monospace,monospace;letter-spacing:2px;font-weight:700}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;opacity:0;transition:.2s;pointer-events:none;font-size:14px}
+#toast.show{opacity:1}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <button id="backBtn" class="ghost sm hide">←</button>
+  <h1 id="title">ヨソウ</h1>
+  <span id="myPts" class="pts hide"></span>
+</header>
+<main>
+  <!-- ログイン -->
+  <section id="vLogin" class="card hide">
+    <h2>友達とポイントで予想しよう</h2>
+    <p class="muted">「明日の小テスト平均は70点超える？」みたいなお題を作って、ポイントを賭けて予想。当たった人で賭け金を山分けします。<br>※ポイントはアプリ内だけのもので、お金や景品には交換できません。</p>
+    <button id="loginBtn">Googleでログイン</button>
+  </section>
+
+  <!-- グループ一覧 -->
+  <section id="vHome" class="hide">
+    <div class="card">
+      <h2>参加中のグループ</h2>
+      <div id="grpList" class="muted">読み込み中…</div>
+    </div>
+    <div class="card">
+      <h2>グループに参加</h2>
+      <div class="row"><input id="joinCode" placeholder="招待コード（6文字）" maxlength="6" autocapitalize="characters"><button id="joinBtn">参加</button></div>
+    </div>
+    <div class="card">
+      <h2>新しいグループを作る</h2>
+      <div class="row"><input id="newGrpName" placeholder="グループ名（例：1年3組）" maxlength="30"><button id="createGrpBtn">作成</button></div>
+    </div>
+    <p class="muted" style="text-align:center"><a href="#" id="logoutBtn" style="color:inherit">ログアウト</a></p>
+  </section>
+
+  <!-- グループ内 -->
+  <section id="vGroup" class="hide">
+    <div class="card row" style="justify-content:space-between">
+      <div><div class="muted">招待コード</div><div id="grpCode" class="code"></div></div>
+      <div class="row"><button id="copyBtn" class="ghost sm">コピー</button><button id="bonusBtn" class="sm">デイリー +100</button></div>
+    </div>
+    <div class="tabs">
+      <button data-tab="open">受付中</button>
+      <button data-tab="done" class="ghost">結果</button>
+      <button data-tab="rank" class="ghost">ランキング</button>
+      <button data-tab="new" class="ghost">＋お題</button>
+    </div>
+    <div id="tOpen"></div>
+    <div id="tDone" class="hide"></div>
+    <div id="tRank" class="card hide"></div>
+    <div id="tNew" class="card hide">
+      <h2>お題を作る</h2>
+      <input id="mTitle" placeholder="お題（例：明日の朝、雨降る？）" maxlength="80">
+      <textarea id="mOpts" rows="3" placeholder="選択肢を1行に1つ（2〜4個）&#10;降る&#10;降らない"></textarea>
+      <div class="muted">締め切り</div>
+      <input id="mDeadline" type="datetime-local">
+      <button id="createMktBtn">作成する</button>
+      <p class="muted">結果はお題を作った人が確定します。</p>
+    </div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, collection, onSnapshot, query, orderBy, runTransaction, writeBatch, increment, arrayUnion, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ▼ Firebaseコンソール → プロジェクト設定 → マイアプリ の設定値に置き換える
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT",
+  appId: "YOUR_APP_ID"
+};
+
+const START_POINTS = 1000;
+const DAILY_BONUS = 100;
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const today = () => new Date().toLocaleDateString("sv-SE");
+const toast = msg => { const t = $("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2200); };
+const show = v => ["vLogin","vHome","vGroup"].forEach(x => $(x).classList.toggle("hide", x !== v));
+
+let me = null, gid = null, myMember = null, members = {}, markets = [], unsubs = [], tab = "open";
+
+// ---------- 認証 ----------
+$("loginBtn").onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch(e => toast("ログイン失敗: " + e.code));
+$("logoutBtn").onclick = e => { e.preventDefault(); signOut(auth); };
+
+onAuthStateChanged(auth, async user => {
+  me = user;
+  leaveGroup();
+  if (!user) { show("vLogin"); return; }
+  await setDoc(doc(db, "users", user.uid), { name: user.displayName || "名無し" }, { merge: true });
+  loadHome();
+});
+
+// ---------- ホーム ----------
+async function loadHome() {
+  leaveGroup();
+  show("vHome");
+  $("title").textContent = "ヨソウ";
+  $("backBtn").classList.add("hide");
+  $("myPts").classList.add("hide");
+  const u = (await getDoc(doc(db, "users", me.uid))).data() || {};
+  const codes = u.groups || [];
+  if (!codes.length) { $("grpList").textContent = "まだグループがありません。作るか、招待コードで参加しよう。"; return; }
+  const rows = await Promise.all(codes.map(async c => {
+    const g = await getDoc(doc(db, "groups", c));
+    const m = await getDoc(doc(db, "groups", c, "members", me.uid));
+    return g.exists() ? { c, name: g.data().name, pts: m.data()?.points ?? 0 } : null;
+  }));
+  $("grpList").innerHTML = rows.filter(Boolean).map(r =>
+    `<div class="grp" data-code="${r.c}"><span>${esc(r.name)}</span><span class="pts">${r.pts.toLocaleString()} pt</span></div>`).join("");
+  $("grpList").querySelectorAll(".grp").forEach(el => el.onclick = () => openGroup(el.dataset.code));
+}
+
+function makeCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
+$("createGrpBtn").onclick = async () => {
+  const name = $("newGrpName").value.trim();
+  if (!name) return toast("グループ名を入れてね");
+  let code;
+  for (let i = 0; i < 5; i++) { code = makeCode(); if (!(await getDoc(doc(db, "groups", code))).exists()) break; }
+  await setDoc(doc(db, "groups", code), { name, createdBy: me.uid, createdAt: serverTimestamp() });
+  $("newGrpName").value = "";
+  await joinGroup(code);
+};
+
+$("joinBtn").onclick = () => {
+  const code = $("joinCode").value.trim().toUpperCase();
+  if (code.length !== 6) return toast("6文字のコードを入れてね");
+  joinGroup(code);
+};
+
+async function joinGroup(code) {
+  const g = await getDoc(doc(db, "groups", code));
+  if (!g.exists()) return toast("グループが見つかりません");
+  const mRef = doc(db, "groups", code, "members", me.uid);
+  if (!(await getDoc(mRef)).exists()) {
+    await setDoc(mRef, { name: me.displayName || "名無し", points: START_POINTS, lastBonus: "", joinedAt: serverTimestamp() });
+  }
+  await setDoc(doc(db, "users", me.uid), { groups: arrayUnion(code) }, { merge: true });
+  $("joinCode").value = "";
+  openGroup(code);
+}
+
+// ---------- グループ ----------
+function leaveGroup() { unsubs.forEach(u => u()); unsubs = []; gid = null; }
+
+async function openGroup(code) {
+  leaveGroup();
+  gid = code;
+  show("vGroup");
+  $("backBtn").classList.remove("hide");
+  $("myPts").classList.remove("hide");
+  $("grpCode").textContent = code;
+  const g = await getDoc(doc(db, "groups", code));
+  $("title").textContent = g.data()?.name || "グループ";
+  setTab("open");
+
+  unsubs.push(onSnapshot(collection(db, "groups", code, "members"), snap => {
+    members = {};
+    snap.forEach(d => members[d.id] = d.data());
+    myMember = members[me.uid];
+    $("myPts").textContent = (myMember?.points ?? 0).toLocaleString() + " pt";
+    $("bonusBtn").disabled = myMember?.lastBonus === today();
+    renderRank(); renderMarkets();
+  }));
+  unsubs.push(onSnapshot(query(collection(db, "groups", code, "markets"), orderBy("createdAt", "desc")), snap => {
+    markets = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderMarkets();
+  }));
+}
+
+$("backBtn").onclick = loadHome;
+$("copyBtn").onclick = () => navigator.clipboard.writeText(gid).then(() => toast("コードをコピーしました"));
+
+$("bonusBtn").onclick = async () => {
+  const ref = doc(db, "groups", gid, "members", me.uid);
+  await runTransaction(db, async tx => {
+    const m = (await tx.get(ref)).data();
+    if (m.lastBonus === today()) throw new Error("今日はもう受け取り済み");
+    tx.update(ref, { points: m.points + DAILY_BONUS, lastBonus: today() });
+  }).then(() => toast(`+${DAILY_BONUS} pt ゲット！`)).catch(e => toast(e.message));
+};
+
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+function setTab(t) {
+  tab = t;
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("ghost", b.dataset.tab !== t));
+  $("tOpen").classList.toggle("hide", t !== "open");
+  $("tDone").classList.toggle("hide", t !== "done");
+  $("tRank").classList.toggle("hide", t !== "rank");
+  $("tNew").classList.toggle("hide", t !== "new");
+  if (t === "new" && !$("mDeadline").value) {
+    const d = new Date(Date.now() + 24 * 3600e3 - new Date().getTimezoneOffset() * 60e3);
+    $("mDeadline").value = d.toISOString().slice(0, 16);
+  }
+}
+
+// ---------- お題作成 ----------
+$("createMktBtn").onclick = async () => {
+  const title = $("mTitle").value.trim();
+  const options = $("mOpts").value.split("\n").map(s => s.trim()).filter(Boolean);
+  const deadline = new Date($("mDeadline").value).getTime();
+  if (!title) return toast("お題を入れてね");
+  if (options.length < 2 || options.length > 4) return toast("選択肢は2〜4個にしてね");
+  if (!(deadline > Date.now())) return toast("締め切りは未来の日時にしてね");
+  await addDoc(collection(db, "groups", gid, "markets"), {
+    title, options, deadline, createdBy: me.uid, createdAt: serverTimestamp(),
+    status: "open", winner: null, pools: options.map(() => 0), total: 0, stakes: {}
+  });
+  $("mTitle").value = ""; $("mOpts").value = "";
+  toast("お題を作りました"); setTab("open");
+};
+
+// ---------- 賭ける ----------
+async function placeBet(mid, opt, amount) {
+  amount = Math.floor(Number(amount));
+  if (!(amount > 0)) return toast("1pt以上で賭けてね");
+  const mRef = doc(db, "groups", gid, "markets", mid);
+  const pRef = doc(db, "groups", gid, "members", me.uid);
+  await runTransaction(db, async tx => {
+    const mk = (await tx.get(mRef)).data();
+    const p = (await tx.get(pRef)).data();
+    if (mk.status !== "open" || Date.now() > mk.deadline) throw new Error("締め切りを過ぎています");
+    if (p.points < amount) throw new Error("ポイントが足りません");
+    const pools = [...mk.pools]; pools[opt] += amount;
+    const mine = { ...(mk.stakes?.[me.uid] || {}) };
+    mine[opt] = (mine[opt] || 0) + amount;
+    tx.update(pRef, { points: p.points - amount });
+    tx.update(mRef, { pools, total: mk.total + amount, [`stakes.${me.uid}`]: mine });
+  }).then(() => toast(`${amount}pt 賭けました`)).catch(e => toast(e.message));
+}
+
+// ---------- 結果確定（パリミュチュエル方式で山分け） ----------
+async function resolve(mid, winner) {
+  const mk = markets.find(m => m.id === mid);
+  if (!confirm(`「${mk.options[winner]}」で確定しますか？取り消せません。`)) return;
+  const mRef = doc(db, "groups", gid, "markets", mid);
+  const batch = writeBatch(db);
+  const winPool = mk.pools[winner];
+  for (const [uid, st] of Object.entries(mk.stakes || {})) {
+    let pay;
+    if (winPool === 0) pay = Object.values(st).reduce((a, b) => a + b, 0); // 誰も当たらなければ全額返金
+    else pay = Math.floor((st[winner] || 0) * mk.total / winPool);
+    if (pay > 0) batch.update(doc(db, "groups", gid, "members", uid), { points: increment(pay) });
+  }
+  batch.update(mRef, { status: "resolved", winner });
+  await batch.commit().then(() => toast("結果を確定しました")).catch(e => toast("失敗: " + e.code));
+}
+
+async function cancelMarket(mid) {
+  const mk = markets.find(m => m.id === mid);
+  if (!confirm("このお題を中止して全員に返金しますか？")) return;
+  const batch = writeBatch(db);
+  for (const [uid, st] of Object.entries(mk.stakes || {})) {
+    const back = Object.values(st).reduce((a, b) => a + b, 0);
+    if (back > 0) batch.update(doc(db, "groups", gid, "members", uid), { points: increment(back) });
+  }
+  batch.update(doc(db, "groups", gid, "markets", mid), { status: "canceled" });
+  await batch.commit().then(() => toast("中止して返金しました"));
+}
+
+// ---------- 描画 ----------
+function fmtDate(ms) { return new Date(ms).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }); }
+
+function marketCard(m) {
+  const closed = Date.now() > m.deadline;
+  const mine = m.stakes?.[me.uid] || {};
+  const isOwner = m.createdBy === me.uid;
+  const badge = m.status === "resolved" ? `<span class="badge done">確定</span>`
+    : m.status === "canceled" ? `<span class="badge closed">中止</span>`
+    : closed ? `<span class="badge closed">締切済・結果待ち</span>` : `<span class="badge">〜${fmtDate(m.deadline)}</span>`;
+  const opts = m.options.map((o, i) => {
+    const pct = m.total ? Math.round(m.pools[i] / m.total * 100) : 0;
+    const odds = m.pools[i] ? (m.total / m.pools[i]).toFixed(2) : "—";
+    const canBet = m.status === "open" && !closed;
+    return `<div class="opt ${m.winner === i ? "win" : ""}">
+      <div class="bar" style="width:${pct}%"></div>
+      <div class="top"><b>${m.winner === i ? "✅ " : ""}${esc(o)}</b><span class="muted">${m.pools[i]}pt・${pct}%・×${odds}</span></div>
+      ${mine[i] ? `<div class="muted">あなた: ${mine[i]}pt</div>` : ""}
+      ${canBet ? `<div class="row" style="margin-top:6px"><input type="number" min="1" inputmode="numeric" placeholder="pt" id="amt-${m.id}-${i}"><button class="sm" data-bet="${m.id}" data-opt="${i}">賭ける</button></div>` : ""}
+      ${isOwner && m.status === "open" && closed ? `<button class="sm ghost" style="margin-top:6px" data-res="${m.id}" data-opt="${i}">これが正解</button>` : ""}
+    </div>`;
+  }).join("");
+  const creator = members[m.createdBy]?.name || "?";
+  return `<div class="card">
+    <div class="row" style="justify-content:space-between"><h2 style="margin:0">${esc(m.title)}</h2>${badge}</div>
+    <div class="muted">作成: ${esc(creator)}・合計 ${m.total}pt</div>
+    ${opts}
+    ${isOwner && m.status === "open" ? `<button class="sm ghost" data-cancel="${m.id}">中止して返金</button>` : ""}
+  </div>`;
+}
+
+function renderMarkets() {
+  if (!gid || !me) return;
+  const open = markets.filter(m => m.status === "open");
+  const done = markets.filter(m => m.status !== "open");
+  $("tOpen").innerHTML = open.length ? open.map(marketCard).join("") : `<div class="card muted">受付中のお題はありません。「＋お題」から作ろう。</div>`;
+  $("tDone").innerHTML = done.length ? done.map(marketCard).join("") : `<div class="card muted">まだ結果はありません。</div>`;
+  document.querySelectorAll("[data-bet]").forEach(b => b.onclick = () =>
+    placeBet(b.dataset.bet, Number(b.dataset.opt), $(`amt-${b.dataset.bet}-${b.dataset.opt}`).value));
+  document.querySelectorAll("[data-res]").forEach(b => b.onclick = () => resolve(b.dataset.res, Number(b.dataset.opt)));
+  document.querySelectorAll("[data-cancel]").forEach(b => b.onclick = () => cancelMarket(b.dataset.cancel));
+}
+
+function renderRank() {
+  const list = Object.entries(members).sort((a, b) => b[1].points - a[1].points);
+  $("tRank").innerHTML = `<h2>ランキング</h2>` + list.map(([uid, m], i) =>
+    `<div class="lb"><span>${["🥇","🥈","🥉"][i] || (i + 1) + "."} ${esc(m.name)}${uid === me.uid ? "（あなた）" : ""}</span><b>${m.points.toLocaleString()} pt</b></div>`).join("");
+}
+</script>
+</body>
+</html>
